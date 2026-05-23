@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EMG Bionic - Neon Grid Runner & Plotter</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            display: flex; flex-direction: column; align-items: center;
+            background-color: #0b0c10; color: #66fcf1; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0; padding: 20px;
+            overflow-x: hidden;
+        }
+        h2 { text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px #45a29e; margin-bottom: 5px;}
+        .sub-title { color: #45a29e; margin-bottom: 20px; font-size: 14px; letter-spacing: 1px;}
+        
+        .main-container { 
+            display: flex; gap: 20px; max-width: 1200px; width: 100%; 
+            justify-content: center; transition: all 0.4s ease;
+        }
+        .left-panel, .right-panel { 
+            display: flex; flex-direction: column; align-items: center; 
+            transition: all 0.4s ease; width: 50%;
+        }
+        #gameCanvas {
+            background-color: #1f2833; border: 3px solid #45a29e; border-radius: 12px;
+            box-shadow: 0 0 30px rgba(102, 252, 241, 0.4);
+            cursor: pointer; transition: all 0.4s ease;
+        }
+        .plotter-container {
+            background-color: #1f2833; border: 3px solid #45a29e; border-radius: 12px;
+            padding: 15px; width: 100%; height: 400px; box-sizing: border-box;
+            box-shadow: 0 0 20px rgba(69, 162, 158, 0.2);
+            cursor: pointer; transition: all 0.4s ease;
+        }
+        .connection-box { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;}
+        .ip-input {
+            padding: 8px 12px; font-size: 14px; border: 2px solid #45a29e;
+            background-color: #0b0c10; color: #66fcf1; border-radius: 6px; width: 150px; text-align: center;
+        }
+
+        /* ── Patient Info Box ── */
+        .patient-box {
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+            justify-content: center; margin-bottom: 12px;
+            background: #1f2833; padding: 10px 18px; border-radius: 10px;
+            border: 1px solid #45a29e;
+        }
+        .patient-box label { color: #45a29e; font-size: 13px; }
+        .patient-input {
+            padding: 7px 10px; font-size: 13px; border: 2px solid #45a29e;
+            background-color: #0b0c10; color: #66fcf1; border-radius: 6px;
+            width: 130px; text-align: center;
+        }
+
+        /* ── Record bar ── */
+        .record-bar {
+            display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; justify-content: center;
+        }
+        .rec-dot {
+            width: 10px; height: 10px; border-radius: 50%; background: #ff4757;
+            animation: blink 1s infinite; display: none;
+        }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+        .rec-dot.active { display: inline-block; }
+        #recStatus { font-size: 13px; color: #45a29e; font-family: monospace; }
+
+        .controls { margin-top: 15px; display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; }
+        button {
+            padding: 12px 20px; font-size: 15px; cursor: pointer;
+            background-color: #1f2833; color: #66fcf1; border: 2px solid #45a29e;
+            border-radius: 8px; font-weight: bold; transition: all 0.3s ease; text-transform: uppercase;
+        }
+        button:hover { background-color: #45a29e; color: #0b0c10; box-shadow: 0 0 15px #66fcf1; }
+        button:disabled { border-color: #555; color: #555; cursor: not-allowed; box-shadow: none; background: #1f2833; }
+        .btn-orange { border-color: #f39c12; color: #f39c12; }
+        .btn-orange:hover { background-color: #f39c12; color: #0b0c10; box-shadow: 0 0 15px #f39c12; }
+        .btn-blue { border-color: #3498db; color: #3498db; }
+        .btn-blue:hover { background-color: #3498db; color: #0b0c10; box-shadow: 0 0 15px #3498db; }
+        .btn-red { border-color: #ff4757; color: #ff4757; }
+        .btn-red:hover { background-color: #ff4757; color: #0b0c10; box-shadow: 0 0 15px #ff4757; }
+        .btn-green { border-color: #2ecc71; color: #2ecc71; }
+        .btn-green:hover { background-color: #2ecc71; color: #0b0c10; box-shadow: 0 0 15px #2ecc71; }
+
+        #status { margin-top: 15px; font-weight: bold; color: #ff4757; font-size: 15px; letter-spacing: 1px; min-height: 22px;}
+        .dashboard { margin-top: 15px; display: flex; gap: 20px; font-family: monospace; font-size: 15px; width: 100%; justify-content: space-around; background: #1f2833; padding: 10px; border-radius: 8px; box-sizing: border-box;}
+        .chart-controls { margin: 10px 0; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+        .chart-controls button { min-width: 110px; padding: 8px 12px; font-size: 13px; }
+
+        .hide-panel { display: none !important; }
+        .full-width-panel { width: 100% !important; max-width: 1200px !important; }
+        .click-tip { font-size: 12px; color: #45a29e; margin-bottom: 5px; font-style: italic; }
+
+        /* Space-bar hint */
+        .space-hint {
+            font-size: 11px; color: #45a29e; margin-top: 6px; font-style: italic; opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+
+<h2>EMG ARMBAND DEVICE</h2>
+<div class="sub-title">Hệ thống đồng bộ dữ liệu sinh học qua Wi-Fi WebSocket</div>
+
+<!-- Patient info -->
+<div class="patient-box">
+    <label>Patient ID:</label>
+    <input type="text" id="patientId" class="patient-input" placeholder="VD: BN001">
+    <label>Tên BN:</label>
+    <input type="text" id="patientName" class="patient-input" placeholder="VD: Nguyen Van A">
+    <label>Ghi chú:</label>
+    <input type="text" id="patientNote" class="patient-input" placeholder="VD: Lần đo 1" style="width:160px">
+</div>
+
+<!-- Connection -->
+<div class="connection-box">
+    <label for="ipAddr">ESP32 IP:</label>
+    <input type="text" id="ipAddr" class="ip-input" value="192.168.43.15"> 
+    <button id="connectBtn" onclick="toggleConnection()">🔗 Kết Nối</button>
+</div>
+
+<!-- Record bar -->
+<div class="record-bar">
+    <span class="rec-dot" id="recDot"></span>
+    <span id="recStatus">Chưa ghi — nhấn "Bắt Đầu Ghi" để thu mẫu</span>
+    <button id="recBtn" class="btn-red" onclick="toggleRecord()" style="padding:8px 14px;font-size:13px;">⏺ Bắt Đầu Ghi</button>
+    <button id="exportBtn" class="btn-green" onclick="exportCSV()" disabled style="padding:8px 14px;font-size:13px;">💾 Export CSV</button>
+</div>
+
+<div class="main-container">
+    <div class="left-panel">
+        <div class="click-tip">💡 Click vào màn hình game để Phóng to / Thu nhỏ</div>
+        <canvas id="gameCanvas" width="580" height="400"></canvas>
+        <div class="controls">
+            <button id="toggleGameBtn" class="btn-orange" onclick="toggleGameLoop()">▶️ Khởi Động Game</button>
+            <button id="calibBtn" class="btn-blue" onclick="sendCalibrateCmd()" disabled>⚙️ Calib Cơ Bắp</button>
+        </div>
+        <div class="space-hint">⌨️ Nhấn <strong>[Space]</strong> để jump (test không cần ESP32) &nbsp;|&nbsp; <strong>[P]</strong> để pause game</div>
+    </div>
+
+    <div class="right-panel">
+        <div class="click-tip">💡 Click vào đồ thị để Phóng to / Thu nhỏ</div>
+        <div class="plotter-container">
+            <canvas id="chartCanvas"></canvas>
+        </div>
+        <div class="chart-controls">
+            <button class="btn-blue" onclick="toggleChartDataset(0)">Envelope</button>
+            <button class="btn-orange" onclick="toggleChartDataset(1)">Ngưỡng ON</button>
+            <button class="btn-blue" onclick="toggleChartDataset(2)">Ngưỡng OFF</button>
+            <button class="btn-orange" onclick="toggleChartDataset(3)">Trạng thái</button>
+            <button id="chartPauseBtn" class="btn-blue" onclick="toggleChartPause()">⏸ Tạm Dừng</button>
+        </div>
+        <div class="dashboard">
+            <div id="envDisplay">ENVELOPE: 0</div>
+            <div id="normDisplay">NORM: 0%</div>
+            <div id="stateDisplay">TRẠNG THÁI: <span style="color:#ff4757">REST</span></div>
+        </div>
+    </div>
+</div>
+
+<div id="status">Chưa kết nối đến thiết bị</div>
+
+<script>
+// ============================================================
+//  WEBSOCKET
+// ============================================================
+let ws = null;
+let emgState = 0;
+
+function toggleConnection() {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        ws.close(); return;
+    }
+    const ip = document.getElementById('ipAddr').value.trim();
+    if (!ip) { alert("Vui lòng nhập địa chỉ IP của ESP32!"); return; }
+
+    document.getElementById('status').innerText = `Đang kết nối WebSocket tới ws://${ip}:81 ...`;
+    document.getElementById('status').style.color = "#f39c12";
+    document.getElementById('connectBtn').innerText = "Đang kết nối...";
+
+    ws = new WebSocket(`ws://${ip}:81`);
+
+    ws.onopen = () => {
+        document.getElementById('status').innerText = "Đồng bộ liên kết dữ liệu Wi-Fi thành công! 📶";
+        document.getElementById('status').style.color = "#66fcf1";
+        document.getElementById('connectBtn').innerText = "❌ Ngắt Kết Nối";
+        document.getElementById('calibBtn').disabled = false;
+    };
+    ws.onclose = () => {
+        document.getElementById('status').innerText = "Mất tín hiệu hoặc chưa kết nối với ESP32 Wearable!";
+        document.getElementById('status').style.color = "#ff4757";
+        document.getElementById('connectBtn').innerText = "🔗 Kết Nối";
+        document.getElementById('calibBtn').disabled = true;
+        emgState = 0;
+        document.getElementById('stateDisplay').innerHTML = 'TRẠNG THÁI: <span style="color:#ff4757">REST</span>';
+    };
+    ws.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            const env = data.env; const norm = data.norm;
+            emgState = data.state;
+            const thOn = data.on; const thOff = data.off;
+
+            document.getElementById('envDisplay').innerText = `ENVELOPE: ${env}`;
+            document.getElementById('normDisplay').innerText = `NORM: ${norm}%`;
+            if (emgState === 1)
+                document.getElementById('stateDisplay').innerHTML = 'TRẠNG THÁI: <span style="color:#00f3ff">CO CƠ (JUMP)</span>';
+            else
+                document.getElementById('stateDisplay').innerHTML = 'TRẠNG THÁI: <span style="color:#ff4757">REST</span>';
+
+            if (gameActive && !isGameOver) player.targetState = emgState;
+
+            pushDataToChart(env, thOn, thOff, emgState * 200);
+
+            // Ghi vào buffer CSV nếu đang record
+            if (isRecording) {
+                const ts = new Date().toISOString();
+                csvBuffer.push([ts, env, norm, thOn, thOff, emgState]);
+                updateRecStatus();
+            }
+        } catch(e) { console.log("Dữ liệu không đồng bộ: ", event.data); }
+    };
+}
+
+function sendCalibrateCmd() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send("cal_start");
+        alert("Đã kích hoạt lệnh Calib! Hãy nhìn màn hình OLED trên mạch để thực hiện.");
+    }
+}
+
+// ============================================================
+//  CSV RECORDING
+// ============================================================
+let isRecording = false;
+let csvBuffer = [];       // Mỗi phần tử = 1 mốc thời gian, không giới hạn số dòng
+let recordStartTime = null;
+
+function toggleRecord() {
+    isRecording = !isRecording;
+    const btn = document.getElementById('recBtn');
+    const dot = document.getElementById('recDot');
+
+    if (isRecording) {
+        csvBuffer = [];
+        recordStartTime = new Date();
+        dot.classList.add('active');
+        btn.innerText = "⏹ Dừng Ghi";
+        btn.classList.remove('btn-red'); btn.classList.add('btn-orange');
+        document.getElementById('exportBtn').disabled = true;
+        updateRecStatus();
+    } else {
+        dot.classList.remove('active');
+        btn.innerText = "⏺ Bắt Đầu Ghi";
+        btn.classList.remove('btn-orange'); btn.classList.add('btn-red');
+        const elapsed = ((new Date() - recordStartTime) / 1000).toFixed(1);
+        document.getElementById('recStatus').innerText =
+            `✅ Đã ghi ${csvBuffer.length} mẫu trong ${elapsed}s — sẵn sàng Export`;
+        document.getElementById('exportBtn').disabled = csvBuffer.length === 0;
+    }
+}
+
+function updateRecStatus() {
+    if (!isRecording) return;
+    const elapsed = ((new Date() - recordStartTime) / 1000).toFixed(1);
+    document.getElementById('recStatus').innerText =
+        `🔴 Đang ghi... ${csvBuffer.length} mẫu | ${elapsed}s`;
+}
+
+function exportCSV() {
+    const pid   = document.getElementById('patientId').value.trim()   || 'UNKNOWN_ID';
+    const pname = document.getElementById('patientName').value.trim() || 'UNKNOWN_NAME';
+    const note  = document.getElementById('patientNote').value.trim() || '';
+
+    // Header metadata (2 dòng đầu để nhận diện file)
+    const metaLine1 = `# EMG Bionic Export | Patient ID: ${pid} | Name: ${pname} | Note: ${note}`;
+    const metaLine2 = `# Session start: ${recordStartTime ? recordStartTime.toISOString() : 'N/A'} | Total samples: ${csvBuffer.length}`;
+    const colHeader = `Timestamp,Envelope,Norm(%),Threshold_ON,Threshold_OFF,State`;
+
+    const rows = csvBuffer.map(r => r.join(','));
+    const csvContent = [metaLine1, metaLine2, colHeader, ...rows].join('\n');
+
+    // Tạo file và kích hoạt tải xuống
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    // Tên file: ID_Name_YYYYMMDD_HHMMSS.csv
+    const now = new Date();
+    const dateStr = now.toISOString().replace(/[:T]/g,'-').slice(0,19);
+    link.href = url;
+    link.download = `${pid}_${pname.replace(/\s+/g,'_')}_${dateStr}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+// ============================================================
+//  CHART.JS REAL-TIME
+// ============================================================
+const chartCtx = document.getElementById('chartCanvas').getContext('2d');
+const MAX_DATA_POINTS = 60;
+const labelsArray = Array(MAX_DATA_POINTS).fill('');
+const envData    = Array(MAX_DATA_POINTS).fill(0);
+const thOnData   = Array(MAX_DATA_POINTS).fill(0);
+const thOffData  = Array(MAX_DATA_POINTS).fill(0);
+const binaryData = Array(MAX_DATA_POINTS).fill(0);
+
+const emgChart = new Chart(chartCtx, {
+    type: 'line',
+    data: {
+        labels: labelsArray,
+        datasets: [
+            { label: 'Envelope',          data: envData,    borderColor: '#66fcf1', borderWidth: 2,   pointRadius: 0, fill: false },
+            { label: 'Ngưỡng ON',         data: thOnData,   borderColor: '#f39c12', borderWidth: 1.5, pointRadius: 0, borderDash: [5,5], fill: false },
+            { label: 'Ngưỡng OFF',        data: thOffData,  borderColor: '#9b59b6', borderWidth: 1.5, pointRadius: 0, borderDash: [5,5], fill: false },
+            { label: 'Trạng thái (x200)', data: binaryData, borderColor: '#ff4757', borderWidth: 1.5, pointRadius: 0, backgroundColor: 'rgba(255,71,87,0.1)', fill: true }
+        ]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        scales: {
+            y: { min: -20, suggestedMax: 400, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#66fcf1' } },
+            x: { display: false }
+        },
+        plugins: { legend: { labels: { color: '#66fcf1', font: { size: 10 } }, position: 'top' } }
+    }
+});
+
+function toggleChartDataset(index) {
+    emgChart.setDatasetVisibility(index, !emgChart.isDatasetVisible(index));
+    emgChart.update();
+}
+
+let chartPaused = false;
+function toggleChartPause() {
+    chartPaused = !chartPaused;
+    const btn = document.getElementById('chartPauseBtn');
+    btn.innerText   = chartPaused ? '▶ Tiếp Tục'  : '⏸ Tạm Dừng';
+    btn.className   = chartPaused ? 'btn-orange'   : 'btn-blue';
+}
+
+function pushDataToChart(env, thOn, thOff, binary) {
+    if (chartPaused) return;
+    emgChart.data.datasets[0].data.shift(); emgChart.data.datasets[0].data.push(env);
+    emgChart.data.datasets[1].data.shift(); emgChart.data.datasets[1].data.push(thOn);
+    emgChart.data.datasets[2].data.shift(); emgChart.data.datasets[2].data.push(thOff);
+    emgChart.data.datasets[3].data.shift(); emgChart.data.datasets[3].data.push(binary);
+    emgChart.update();
+}
+
+// ============================================================
+//  GAME ENGINE
+// ============================================================
+const canvas = document.getElementById("gameCanvas");
+const ctx    = canvas.getContext("2d");
+
+let gameActive = false;
+let isGameOver = false;
+let score = 0, frames = 0;
+let animationFrameId = null;
+
+const LANE_CEILING = 50;
+const LANE_FLOOR   = canvas.height - 50;
+
+// ── Space bar / keyboard control ──
+let spaceHeld = false;   // true khi đang giữ Space
+
+document.addEventListener('keydown', (e) => {
+    // Space → jump
+    if (e.code === 'Space') {
+        e.preventDefault();   // chặn trang cuộn
+        if (!spaceHeld) {
+            spaceHeld = true;
+            if (gameActive && !isGameOver) player.targetState = 1;
+        }
+    }
+    // P → pause/resume game
+    if (e.code === 'KeyP') {
+        if (!isGameOver) toggleGameLoop();
+    }
+    // R → chơi lại khi game over
+    if (e.code === 'KeyR' && isGameOver) resetGame();
+});
+
+document.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') {
+        spaceHeld = false;
+        if (gameActive && !isGameOver) {
+            // Chỉ trả về REST nếu không có tín hiệu ESP32 thực
+            if (!ws || ws.readyState !== WebSocket.OPEN) player.targetState = 0;
+            else player.targetState = emgState; // Trả quyền cho ESP32
+        }
+    }
+});
+
+const player = {
+    x: 100, y: LANE_FLOOR - 20, radius: 15, targetState: 0,
+    update() {
+        let targetY = (this.targetState === 1) ? LANE_CEILING : (LANE_FLOOR - this.radius * 2);
+        this.y += (targetY - this.y) * 0.4;
+    },
+    draw() {
+        ctx.save();
+        ctx.shadowBlur = 20; ctx.shadowColor = "#00f3ff";
+        ctx.fillStyle = "rgba(0,243,255,0.4)";
+        ctx.beginPath(); ctx.ellipse(this.x, this.y + this.radius, 20, 8, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath(); ctx.arc(this.x, this.y + this.radius, this.radius, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = "#00f3ff"; ctx.lineWidth = 4; ctx.stroke();
+        ctx.restore();
+    }
+};
+
+const obstacles = {
+    array: [], speed: 2.8, spawnRate: 130,
+    draw() {
+        for (let obs of this.array) {
+            ctx.save();
+            ctx.shadowBlur = 15; ctx.shadowColor = "#ff0055";
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(obs.x + obs.width/2 - 2, obs.y, 4, obs.height);
+            ctx.fillStyle = "rgba(255,0,85,0.6)";
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            ctx.shadowBlur = 0; ctx.fillStyle = "#111"; ctx.strokeStyle = "#ff0055"; ctx.lineWidth = 2;
+            let bh = 10;
+            if (obs.isTop) { ctx.fillRect(obs.x-5, obs.y, obs.width+10, bh); ctx.strokeRect(obs.x-5, obs.y, obs.width+10, bh); }
+            else { ctx.fillRect(obs.x-5, obs.y+obs.height-bh, obs.width+10, bh); ctx.strokeRect(obs.x-5, obs.y+obs.height-bh, obs.width+10, bh); }
+            ctx.restore();
+        }
+    },
+    update() {
+        if (frames % 600 === 0 && this.speed < 7) this.speed += 0.3;
+        if (frames % this.spawnRate === 0) {
+            let isTop = Math.random() > 0.5;
+            let h = Math.random() * 60 + 60;
+            this.array.push({ x: canvas.width, y: isTop ? LANE_CEILING : (LANE_FLOOR - h), width: 22, height: h, passed: false, isTop });
+        }
+        for (let i = 0; i < this.array.length; i++) {
+            let obs = this.array[i];
+            obs.x -= this.speed;
+            let tx = player.x < obs.x ? obs.x : (player.x > obs.x + obs.width ? obs.x + obs.width : player.x);
+            let ty = (player.y + player.radius) < obs.y ? obs.y : ((player.y + player.radius) > obs.y + obs.height ? obs.y + obs.height : player.y + player.radius);
+            let dx = player.x - tx, dy = (player.y + player.radius) - ty;
+            if (Math.sqrt(dx*dx + dy*dy) <= player.radius - 2) { endGame(); return; }
+            if (obs.x + obs.width < player.x - player.radius && !obs.passed) { score++; obs.passed = true; }
+            if (obs.x + obs.width < 0) { this.array.splice(i, 1); i--; }
+        }
+    },
+    reset() { this.array = []; this.speed = 2.8; }
+};
+
+let gridOffset = 0;
+function drawCyberScenery() {
+    ctx.fillStyle = "#0b0c10"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (gameActive && !isGameOver) gridOffset += obstacles.speed * 0.5;
+    if (gridOffset > 40) gridOffset = 0;
+    ctx.save(); ctx.strokeStyle = "rgba(69,162,158,0.15)"; ctx.lineWidth = 1;
+    for (let i = -40; i < canvas.width; i += 40) { let x = i - gridOffset % 40; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
+    for (let j = 0; j < canvas.height; j += 40) { ctx.beginPath(); ctx.moveTo(0,j); ctx.lineTo(canvas.width,j); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle = "#1f2833";
+    ctx.fillRect(0, 0, canvas.width, LANE_CEILING);
+    ctx.fillRect(0, LANE_FLOOR, canvas.width, canvas.height - LANE_FLOOR);
+    ctx.save(); ctx.shadowBlur = 10; ctx.shadowColor = "#45a29e"; ctx.fillStyle = "#66fcf1";
+    ctx.fillRect(0, LANE_CEILING - 2, canvas.width, 2);
+    ctx.fillRect(0, LANE_FLOOR, canvas.width, 2);
+    ctx.restore();
+}
+
+function drawScore() {
+    ctx.save();
+    ctx.fillStyle = "#66fcf1"; ctx.font = "bold 20px 'Segoe UI'";
+    ctx.shadowBlur = 8; ctx.shadowColor = "#45a29e";
+    ctx.fillText("SCORE: " + score, 20, 35);
+    // Hiển thị nguồn điều khiển
+    const src = (ws && ws.readyState === WebSocket.OPEN) ? "ESP32" : "KEYBOARD";
+    ctx.font = "11px 'Segoe UI'"; ctx.fillStyle = "#45a29e";
+    ctx.fillText("INPUT: " + src, 20, 52);
+    ctx.restore();
+}
+
+function drawIdleScreen() {
+    drawCyberScenery(); player.draw();
+    ctx.save();
+    ctx.fillStyle = "#66fcf1"; ctx.font = "bold 22px 'Segoe UI'";
+    ctx.textAlign = "center"; ctx.shadowBlur = 10; ctx.shadowColor = "#45a29e";
+    ctx.fillText("Nhấn ▶️ Khởi Động Game", canvas.width/2, canvas.height/2 - 25);
+    ctx.font = "14px 'Segoe UI'"; ctx.fillStyle = "#45a29e";
+    ctx.fillText("Kết nối ESP32 và co cơ để điều khiển", canvas.width/2, canvas.height/2 + 10);
+    ctx.fillText("Hoặc giữ [Space] để jump  |  [P] pause  |  [R] chơi lại", canvas.width/2, canvas.height/2 + 32);
+    ctx.textAlign = "left"; ctx.restore();
+}
+
+function gameLoop() {
+    if (!gameActive || isGameOver) return;
+    frames++;
+    // Nếu không có ESP32, Space bar điều khiển trực tiếp
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        player.targetState = spaceHeld ? 1 : 0;
+    }
+    player.update();
+    drawCyberScenery(); obstacles.update(); obstacles.draw(); player.draw(); drawScore();
+    animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+    isGameOver = true; gameActive = false;
+    drawCyberScenery(); obstacles.draw(); player.draw();
+    ctx.save();
+    ctx.fillStyle = "rgba(11,12,16,0.75)"; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.textAlign = "center";
+    ctx.shadowBlur = 20; ctx.shadowColor = "#ff4757"; ctx.fillStyle = "#ff4757";
+    ctx.font = "bold 42px 'Segoe UI'"; ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2 - 50);
+    ctx.shadowColor = "#66fcf1"; ctx.shadowBlur = 10; ctx.fillStyle = "#66fcf1";
+    ctx.font = "bold 24px 'Segoe UI'"; ctx.fillText("SCORE: " + score, canvas.width/2, canvas.height/2 - 10);
+    ctx.fillStyle = "#45a29e"; ctx.font = "15px 'Segoe UI'";
+    ctx.fillText("Nhấn ▶️ Khởi Động Game hoặc [R] để chơi lại", canvas.width/2, canvas.height/2 + 28);
+    ctx.textAlign = "left"; ctx.restore();
+    document.getElementById("toggleGameBtn").innerText = "🔄 Chơi Lại";
+    document.getElementById("toggleGameBtn").className = "btn-orange";
+}
+
+function resetGame() {
+    score = 0; frames = 0; isGameOver = false;
+    player.y = LANE_FLOOR - player.radius * 2; player.targetState = 0;
+    obstacles.reset(); gridOffset = 0; gameActive = true;
+    document.getElementById("toggleGameBtn").innerText = "⏸️ Tạm Dừng Game";
+    document.getElementById("toggleGameBtn").className = "btn-orange";
+    animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+function toggleGameLoop() {
+    if (isGameOver) { resetGame(); return; }
+    gameActive = !gameActive;
+    const btn = document.getElementById("toggleGameBtn");
+    if (gameActive) {
+        btn.innerText = "⏸️ Tạm Dừng Game"; btn.className = "btn-orange";
+        animationFrameId = requestAnimationFrame(gameLoop);
+    } else {
+        btn.innerText = "▶️ Tiếp Tục Game"; btn.className = "btn-orange";
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    }
+}
+
+// ============================================================
+//  FOCUS MODE (PHÓNG TO / THU NHỎ)
+// ============================================================
+let viewMode = 0;
+const leftPanel       = document.querySelector('.left-panel');
+const rightPanel      = document.querySelector('.right-panel');
+const gameCanvas      = document.getElementById("gameCanvas");
+const plotterContainer= document.querySelector('.plotter-container');
+
+gameCanvas.addEventListener('click', () => {
+    if (viewMode === 0) {
+        rightPanel.classList.add('hide-panel'); leftPanel.classList.add('full-width-panel');
+        gameCanvas.width = 1150; viewMode = 1;
+    } else if (viewMode === 1) {
+        rightPanel.classList.remove('hide-panel'); leftPanel.classList.remove('full-width-panel');
+        gameCanvas.width = 580; viewMode = 0;
+    }
+});
+plotterContainer.addEventListener('click', () => {
+    if (viewMode === 0) { leftPanel.classList.add('hide-panel'); rightPanel.classList.add('full-width-panel'); viewMode = 2; }
+    else if (viewMode === 2) { leftPanel.classList.remove('hide-panel'); rightPanel.classList.remove('full-width-panel'); viewMode = 0; }
+    setTimeout(() => { emgChart.resize(); }, 50);
+});
+
+// Khởi tạo
+drawIdleScreen();
+</script>
+</body>
+</html>
